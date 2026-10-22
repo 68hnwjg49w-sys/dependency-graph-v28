@@ -12,3 +12,7 @@ class ConfigError(AppError):
         """Запоминает список сообщений об ошибках."""
         super().__init__("\n".join(messages))
         self.messages = list(messages)
+
+
+class RepositoryError(AppError):
+    """Ошибка получения данных о пакете из репозитория."""
