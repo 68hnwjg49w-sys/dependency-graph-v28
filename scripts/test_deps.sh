@@ -1,12 +1,15 @@
 #!/bin/sh
-# Демонстрация этапа 2: прямые зависимости пакетов npm по URL реестра.
+# Демонстрация работы с реестром npm: графы зависимостей пакетов
+# и ошибки получения данных.
 # Нужен доступ в интернет к https://registry.npmjs.org.
 cd "$(dirname "$0")/.." || exit 1
 
-for file in config.ini configs/react.ini configs/babel_core.ini \
+for file in configs/debug.ini configs/react.ini config.ini \
         configs/express.ini; do
     echo
     echo "Конфигурация $file:"
+    sed -n '1s/^; //p' "$file"
+    grep -E '^(package|filter) =' "$file"
     ./run.sh --config "$file" 2>&1
     echo "код завершения: $?"
 done
@@ -18,11 +21,6 @@ for file in configs/fetch_errors/*.ini; do
     ./run.sh --config "$file" 2>&1
     echo "код завершения: $?"
 done
-
-echo
-echo "Тестовый режим (будет реализован на этапе 3):"
-./run.sh --config configs/test_mode.ini 2>&1
-echo "код завершения: $?"
 
 echo
 echo "Ошибка конфигурации по-прежнему проверяется:"

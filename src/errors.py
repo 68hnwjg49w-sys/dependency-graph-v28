@@ -16,3 +16,7 @@ class ConfigError(AppError):
 
 class RepositoryError(AppError):
     """Ошибка получения данных о пакете из репозитория."""
+
+
+class GraphError(AppError):
+    """Ошибка построения графа зависимостей."""

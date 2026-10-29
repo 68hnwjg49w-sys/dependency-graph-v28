@@ -7,6 +7,7 @@ import urllib.error
 from src.errors import RepositoryError
 from src.npm import (
     ACCEPT,
+    NpmRepository,
     direct_dependencies,
     fetch_document,
     get_direct_dependencies,
@@ -121,6 +122,18 @@ class GetDirectDependenciesTest(unittest.TestCase):
             REGISTRY, "@babel/core", opener)
         self.assertEqual(version, "7.0.0")
         self.assertEqual(dependencies, {"@babel/parser": "^7.0.0"})
+
+
+class NpmRepositoryTest(unittest.TestCase):
+    """Проверяет источник зависимостей для графа — реестр npm."""
+
+    def test_dependency_names_sorted(self):
+        """Возвращаются имена зависимостей по алфавиту, версия запомнена."""
+        opener = FakeOpener({REGISTRY + "/a": package_document(
+            "3.0.0", {"z": "^1", "b": "^2"})})
+        repository = NpmRepository(REGISTRY, opener)
+        self.assertEqual(repository.dependencies("a"), ["b", "z"])
+        self.assertEqual(repository.versions, {"a": "3.0.0"})
 
 
 if __name__ == "__main__":

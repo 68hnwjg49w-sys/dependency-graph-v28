@@ -91,3 +91,20 @@ def get_direct_dependencies(repository, package,
     """Загружает документ пакета и извлекает его прямые зависимости."""
     document = fetch_document(package_url(repository, package), opener)
     return direct_dependencies(document, package)
+
+
+class NpmRepository:
+    """Источник зависимостей — реестр npm по URL (последние версии)."""
+
+    def __init__(self, repository, opener=urllib.request.urlopen):
+        """Запоминает адрес реестра и функцию загрузки."""
+        self.repository = repository
+        self.opener = opener
+        self.versions = {}
+
+    def dependencies(self, package):
+        """Возвращает имена прямых зависимостей последней версии пакета."""
+        version, dependencies = get_direct_dependencies(
+            self.repository, package, self.opener)
+        self.versions[package] = version
+        return sorted(dependencies)
