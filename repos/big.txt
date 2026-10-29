@@ -1,0 +1,8 @@
+# Граф побольше: общие зависимости, цикл и многобуквенные имена.
+APP: CORE UI LOG
+CORE: UTIL LOG
+UI: CORE THEME UTIL
+THEME: COLOR
+COLOR: UTIL
+LOG: UTIL
+UTIL: APP
