@@ -63,3 +63,24 @@ def _remember(items, name):
     """Добавляет имя в список, если его там ещё нет."""
     if name not in items:
         items.append(name)
+
+
+def load_order(graph):
+    """Порядок загрузки: каждый пакет идёт после всех своих зависимостей.
+
+    Порядок — выход из вершин при обходе графа в глубину (обратный
+    топологический порядок). Ребро, замыкающее цикл, при этом не
+    учитывается: внутри цикла порядок условный.
+    """
+    order = []
+    _post_order(graph.root, graph, set(), order)
+    return order
+
+
+def _post_order(name, graph, seen, order):
+    """Добавляет пакет в порядок после его зависимостей (рекурсивно)."""
+    seen.add(name)
+    for dependency in graph.edges[name]:
+        if dependency not in seen:
+            _post_order(dependency, graph, seen, order)
+    order.append(name)

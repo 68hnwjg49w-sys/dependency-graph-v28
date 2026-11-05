@@ -20,6 +20,7 @@ class FileRepository:
     def __init__(self, packages):
         """Запоминает словарь «пакет — список зависимостей»."""
         self.packages = packages
+        self.versions = {}
 
     @classmethod
     def load(cls, path):

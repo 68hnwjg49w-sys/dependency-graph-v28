@@ -3,7 +3,7 @@
 import unittest
 
 from src.errors import GraphError, RepositoryError
-from src.graph import build_graph, is_excluded
+from src.graph import build_graph, is_excluded, load_order
 from src.testrepo import FileRepository, parse_repository
 
 
@@ -148,6 +148,60 @@ class MissingPackageTest(unittest.TestCase):
         """Неописанный корень — ошибка."""
         with self.assertRaisesRegex(RepositoryError, "пакет Z не найден"):
             build_graph("Z", repository("A:\n"))
+
+
+class LoadOrderTest(unittest.TestCase):
+    """Проверяет порядок загрузки зависимостей."""
+
+    def order(self, text, root="A", name_filter=""):
+        """Строит граф из текста и возвращает порядок загрузки."""
+        return load_order(build_graph(root, repository(text), name_filter))
+
+    def assert_dependencies_first(self, text, order):
+        """Каждый пакет стоит после всех своих зависимостей."""
+        packages = parse_repository(text)
+        position = {name: index for index, name in enumerate(order)}
+        for name in order:
+            for dependency in packages[name]:
+                if dependency in position:
+                    self.assertLess(position[dependency], position[name])
+
+    def test_chain(self):
+        """Цепочка загружается с конца."""
+        self.assertEqual(self.order("A: B\nB: C\nC:\n"), ["C", "B", "A"])
+
+    def test_diamond(self):
+        """Общая зависимость загружается один раз и раньше всех."""
+        text = "A: B C\nB: D\nC: D\nD:\n"
+        order = self.order(text)
+        self.assertEqual(order, ["D", "B", "C", "A"])
+        self.assert_dependencies_first(text, order)
+
+    def test_root_is_last(self):
+        """Анализируемый пакет загружается последним."""
+        text = "APP: CORE UI\nCORE: UTIL\nUI: CORE UTIL\nUTIL:\n"
+        order = self.order(text, "APP")
+        self.assertEqual(order[-1], "APP")
+        self.assertEqual(len(order), len(set(order)))
+        self.assert_dependencies_first(text, order)
+
+    def test_single_package(self):
+        """Пакет без зависимостей — порядок из одного пакета."""
+        self.assertEqual(self.order("A:\n"), ["A"])
+
+    def test_cycle_terminates(self):
+        """Цикл не мешает построить порядок: все пакеты по одному разу."""
+        order = self.order("A: B\nB: C\nC: A D\nD:\n")
+        self.assertEqual(order, ["D", "C", "B", "A"])
+
+    def test_self_dependency(self):
+        """Зависимость от себя не приводит к повтору пакета."""
+        self.assertEqual(self.order("A: A B\nB:\n"), ["B", "A"])
+
+    def test_filtered_packages_absent(self):
+        """Исключённые фильтром пакеты в порядок не попадают."""
+        order = self.order("A: B XB\nB:\nXB: C\nC:\n", "A", "X")
+        self.assertEqual(order, ["B", "A"])
 
 
 if __name__ == "__main__":

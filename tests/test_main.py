@@ -38,20 +38,22 @@ class MainTestCase(unittest.TestCase):
         """Удаляет временный каталог."""
         self._tmp.cleanup()
 
-    def run_main(self, text, opener=None):
+    def run_main(self, text, opener=None, extra=()):
         """Пишет INI, запускает main и возвращает код, вывод и ошибки."""
         path = self.base / "config.ini"
         path.write_text(text, encoding="utf-8")
         out, err = io.StringIO(), io.StringIO()
+        argv = ["--config", str(path)] + list(extra)
         with redirect_stdout(out), redirect_stderr(err):
-            code = main(["--config", str(path)], opener or FakeOpener())
+            code = main(argv, opener or FakeOpener())
         return code, out.getvalue(), err.getvalue()
 
-    def run_test_repo(self, text, package="A", name_filter=""):
+    def run_test_repo(self, text, package="A", name_filter="", extra=()):
         """Запускает main с тестовым репозиторием из текста."""
         repo = self.base / "repo.txt"
         repo.write_text(text, encoding="utf-8")
-        return self.run_main(TEST_CONFIG.format(package, repo, name_filter))
+        config = TEST_CONFIG.format(package, repo, name_filter)
+        return self.run_main(config, None, extra)
 
 
 class NpmGraphTest(MainTestCase):
@@ -133,6 +135,54 @@ class TestModeTest(MainTestCase):
         code, _, err = self.run_test_repo("XA:\n", "XA", "X")
         self.assertEqual(code, EXIT_DATA_ERROR)
         self.assertIn("подстроку фильтра", err)
+
+
+class LoadOrderModeTest(MainTestCase):
+    """Проверяет режим вывода порядка загрузки (--load-order)."""
+
+    def test_test_repository_order(self):
+        """Порядок выводится нумерованным списком, корень последним."""
+        code, out, _ = self.run_test_repo(
+            "A: B C\nB: D\nC: D\nD:\n", extra=["--load-order"])
+        self.assertEqual(code, EXIT_OK)
+        self.assertEqual(out.splitlines(), [
+            "Порядок загрузки зависимостей пакета A:",
+            "  1. D",
+            "  2. B",
+            "  3. C",
+            "  4. A",
+        ])
+
+    def test_cycles_and_filter_reported(self):
+        """Циклы и исключённые пакеты выводятся после порядка."""
+        _, out, _ = self.run_test_repo(
+            "A: B XC\nB: A\nXC:\n", "A", "X", ["--load-order"])
+        self.assertIn("Исключены фильтром 'X': XC", out)
+        self.assertIn("Порядок внутри циклов условный, циклы:", out)
+        self.assertIn("  A -> B -> A", out)
+
+    def test_npm_versions_in_order(self):
+        """Для реестра npm рядом с пакетом выводится его версия."""
+        opener = FakeOpener({
+            REGISTRY + "/app": package_document("1.0.0", {"lib": "^2"}),
+            REGISTRY + "/lib": package_document("2.0.0"),
+        })
+        _, out, _ = self.run_main(
+            NPM_CONFIG.format("app", ""), opener, ["--load-order"])
+        self.assertIn("  1. lib 2.0.0\n  2. app 1.0.0", out)
+
+    def test_wide_numbers_aligned(self):
+        """При десяти и более пакетах номера выровнены по правому краю."""
+        text = "".join("{}: {}\n".format(chr(65 + i), chr(66 + i))
+                       for i in range(10)) + "K:\n"
+        _, out, _ = self.run_test_repo(text, extra=["--load-order"])
+        self.assertIn("\n   1. K\n", out)
+        self.assertIn("\n  11. A\n", out)
+
+    def test_graph_is_default(self):
+        """Без --load-order выводится граф, как на этапе 3."""
+        _, out, _ = self.run_test_repo("A:\n")
+        self.assertIn("Граф зависимостей пакета A", out)
 
 
 class ConfigErrorTest(MainTestCase):
